@@ -276,16 +276,23 @@ class Trainer():
                     global_idx += 1
         return best_scores
 
-def get_dataset(args, datasets, data_dir, tokenizer, split_name):
-    datasets = datasets.split(',')
-    dataset_dict = None
-    dataset_name=''
-    label = 0
+def get_dataset(args, target_data_dir, target_dataset, tokenizer, split_name, source_data_dir=None, source_dataset=None):
+    dataset_dict_source = None
+    dataset_dict_target = None
+    data_encodings_source = None
+    if source_data_dir is not None and source_dataset is not None:
+        source_dataset_name = f'_{source_dataset}'
+        data_encodings_source = read_and_process(args, tokenizer, dataset_dict_source, source_data_dir, source_dataset_name, split_name)
+    datasets = target_dataset.split(',')
     for dataset in datasets:
-        dataset_name += f'_{dataset}'
-        dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}', label=label)
-        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
-    data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
+        target_dataset_name = f'_{dataset}'
+        dataset_dict_curr = util.read_squad(f'{target_data_dir}/{dataset}', label=1)
+        dataset_dict_target = util.merge(dataset_dict_target, dataset_dict_curr)
+    data_encodings_target = read_and_process(args, tokenizer, dataset_dict_target, target_data_dir, target_dataset_name, split_name)
+    dataset_dict = dataset_dict_target.update(dataset_dict_source)
+    if len(dataset_dict) > len(dataset_dict_target) and split_name=='train':
+        print('...successfully merged training data...')
+    data_encodings = data_encodings_target.update(data_encodings_source)
     return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
 
 def main():
@@ -311,9 +318,18 @@ def main():
         if args.load_weights != '':
             args.load_weights = os.path.join(args.load_weights, 'checkpoint', model.WEIGHTS_NAME)
         trainer = Trainer(args, log, model)
-        train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train')
+        #target_data_dir, target_dataset, tokenizer, split_name, source_data_dir = None, source_dataset = None
+        train_dataset, _ = get_dataset(args, \
+                                       args.target_train_dir,\
+                                       args.target_train_datasets,\
+                                       tokenizer, 'train', \
+                                       source_data_dir=args.source_train_dir, \
+                                       source_dataset=args.source_train_datasets)
         log.info("Preparing Validation Data...")
-        val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val')
+        val_dataset, val_dict = get_dataset(args, \
+                                       args.eval_dir,\
+                                       args.eval_datasets,\
+                                       tokenizer, 'val')
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
                                 sampler=RandomSampler(train_dataset))
