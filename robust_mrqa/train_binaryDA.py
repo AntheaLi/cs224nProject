@@ -157,8 +157,9 @@ class Trainer():
         qa_params = list(self.model.distilbert.parameters())
         dis_params = list(self.model.discriminator.parameters())
         self.qa_optim = AdamW(qa_params, lr=self.lr)
+        self.dis_optim = AdamW(dis_params, lr=self.lr*10)
 
-    def save(self, model):
+def save(self, model):
         model.save_pretrained(self.path)
 
     def cal_running_avg_loss(self, loss, running_avg_loss, decay=0.99):
