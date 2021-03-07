@@ -14,6 +14,7 @@ from distilbert_DANN import DomainQA
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from args import get_train_test_args
+import xuran_perform_eda
 
 from tqdm import tqdm
 
@@ -153,10 +154,9 @@ class Trainer():
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         self.model = model
-        qa_params = list(self.model.distilbert.parameters()) + list(self.model.qa_outputs.parameters())
+        qa_params = list(self.model.distilbert.parameters())
         dis_params = list(self.model.discriminator.parameters())
         self.qa_optim = AdamW(qa_params, lr=self.lr)
-        self.dis_optim = AdamW(dis_params, lr=self.lr)
 
     def save(self, model):
         model.save_pretrained(self.path)
@@ -214,6 +214,7 @@ class Trainer():
         if self.args.load_weights != '':
             self.model.load_state_dict(torch.load(self.args.load_weights))
             print('loaded pretrained weights ... ')
+        self.model.train()
         global_idx = 0
         avg_qa_loss = 0
         avg_dis_loss = 0
@@ -224,9 +225,6 @@ class Trainer():
             self.log.info(f'Epoch: {epoch_num}')
             with torch.enable_grad(), tqdm(total=len(train_dataloader.dataset)) as progress_bar:
                 for batch in train_dataloader:
-                    self.qa_optim.zero_grad()
-                    self.dis_optim.zero_grad()
-                    self.model.train()
                     input_ids = batch['input_ids'].to(device)
                     attention_mask = batch['attention_mask'].to(device)
                     start_positions = batch['start_positions'].to(device)
@@ -234,7 +232,7 @@ class Trainer():
                     labels = batch['label'].to(device)
                     ##################################
                     # start adversarial training
-
+                    self.qa_optim.zero_grad()
                     qa_loss = self.model(input_ids, attention_mask=attention_mask,
                                     start_positions=start_positions,
                                     end_positions=end_positions, labels=labels, dtype='qa',
@@ -242,13 +240,16 @@ class Trainer():
                     qa_loss = qa_loss.mean()
                     qa_loss.backward()
                     avg_g_loss = self.cal_running_avg_loss(qa_loss.item(), avg_qa_loss)
+                    self.qa_optim.step()
 
+                    self.dis_optim.zero_grad()
                     dis_loss = self.model(input_ids, attention_mask=attention_mask,
                                     start_positions=start_positions,
                                     end_positions=end_positions, labels=labels, dtype='dis',
                                     global_step=step)
                     dis_loss = dis_loss.mean()
                     dis_loss.backward()
+
                     avg_dis_loss = self.cal_running_avg_loss(dis_loss.item(), avg_dis_loss)
                     self.dis_optim.step()
 
@@ -277,25 +278,30 @@ class Trainer():
                     global_idx += 1
         return best_scores
 
+
 def get_train_dataset(args, target_data_dir, target_dataset, tokenizer, split_name, source_data_dir=None, source_dataset=None):
     dataset_dict_source = None
     dataset_dict_target = None
     data_encodings_source = None
-    source_dataset_name = 'binary'
-    target_dataset_name = 'binary'
+    source_dataset_name = 'individual'
+    target_dataset_name = 'individual'
     if source_data_dir is not None and source_dataset is not None:
         datasets = source_dataset.split(',')  
+        label = 0
         for dataset in datasets:
             source_dataset_name += f'_{dataset}'
-            dataset_dict_curr = util.read_squad(f'{source_data_dir}/{dataset}',label=0)
+            dataset_dict_curr = util.read_squad(f'{source_data_dir}/{dataset}',label=label)
             dataset_dict_source = util.merge(dataset_dict_source, dataset_dict_curr)
+            label += 1
         data_encodings_source = read_and_process(args, tokenizer, dataset_dict_source, source_data_dir, source_dataset_name, split_name)
+    label = 3
     datasets = target_dataset.split(',')
     for dataset in datasets:
         target_dataset_name = f'_{dataset}'
         # dataset_dict_curr = util.read_squad(f'{target_data_dir}/{dataset}', label=1)
-        dataset_dict_curr = xuran_perform_eda.perform_eda(f'{target_data_dir}/{dataset}', dataset, train_fraction=1, label=1)
+        dataset_dict_curr = xuran_perform_eda.perform_eda(f'{target_data_dir}/{dataset}', dataset, train_fraction=1, label=label)
         dataset_dict_target = util.merge(dataset_dict_target, dataset_dict_curr)
+        label += 1
     data_encodings_target = read_and_process(args, tokenizer, dataset_dict_target, target_data_dir, target_dataset_name, split_name)
     dataset_dict = util.merge(dataset_dict_source, dataset_dict_target)
     data_encodings = util.merge(data_encodings_source, data_encodings_target)
@@ -304,13 +310,17 @@ def get_train_dataset(args, target_data_dir, target_dataset, tokenizer, split_na
 def get_dataset(args, datasets, data_dir, tokenizer, split_name):
     datasets = datasets.split(',')
     dataset_dict = None
-    dataset_name='binary'
+    dataset_name='individual'
+    label = 3 if 'val' in split_name else 0
     for dataset in datasets:
         dataset_name += f'_{dataset}'
-        dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}', label=1)
+        dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}', label=label)
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+        label += 1        
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
+
+
 def main():
     # define parser and arguments
     args = get_train_test_args()
@@ -339,7 +349,6 @@ def main():
             print('loaded pretrained distilbert weights from', args.load_distilbert_weights)
 
         trainer = Trainer(args, log, model)
-        #target_data_dir, target_dataset, tokenizer, split_name, source_data_dir = None, source_dataset = None
         train_dataset, _ = get_train_dataset(args, \
                                        args.target_train_dir,\
                                        args.target_train_datasets,\
@@ -348,8 +357,8 @@ def main():
                                        source_dataset=args.source_train_datasets)
         log.info("Preparing Validation Data...")
         val_dataset, val_dict = get_dataset(args, \
-                                       args.eval_dir,\
                                        args.eval_datasets,\
+                                       args.eval_dir,\
                                        tokenizer, 'val')
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,

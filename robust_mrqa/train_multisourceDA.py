@@ -154,10 +154,9 @@ class Trainer():
         if not os.path.exists(self.path):
             os.makedirs(self.path)
         self.model = model
-        qa_params = list(self.model.distilbert.parameters()) + list(self.model.qa_outputs.parameters())
+        qa_params = list(self.model.distilbert.parameters())
         dis_params = list(self.model.discriminator.parameters())
         self.qa_optim = AdamW(qa_params, lr=self.lr)
-        self.dis_optim = AdamW(dis_params, lr=self.lr)
 
     def save(self, model):
         model.save_pretrained(self.path)
@@ -215,6 +214,7 @@ class Trainer():
         if self.args.load_weights != '':
             self.model.load_state_dict(torch.load(self.args.load_weights))
             print('loaded pretrained weights ... ')
+        self.model.train()
         global_idx = 0
         avg_qa_loss = 0
         avg_dis_loss = 0
@@ -225,9 +225,6 @@ class Trainer():
             self.log.info(f'Epoch: {epoch_num}')
             with torch.enable_grad(), tqdm(total=len(train_dataloader.dataset)) as progress_bar:
                 for batch in train_dataloader:
-                    self.qa_optim.zero_grad()
-                    self.dis_optim.zero_grad()
-                    self.model.train()
                     input_ids = batch['input_ids'].to(device)
                     attention_mask = batch['attention_mask'].to(device)
                     start_positions = batch['start_positions'].to(device)
@@ -235,7 +232,7 @@ class Trainer():
                     labels = batch['label'].to(device)
                     ##################################
                     # start adversarial training
-
+                    self.qa_optim.zero_grad()
                     qa_loss = self.model(input_ids, attention_mask=attention_mask,
                                     start_positions=start_positions,
                                     end_positions=end_positions, labels=labels, dtype='qa',
@@ -243,13 +240,16 @@ class Trainer():
                     qa_loss = qa_loss.mean()
                     qa_loss.backward()
                     avg_g_loss = self.cal_running_avg_loss(qa_loss.item(), avg_qa_loss)
+                    self.qa_optim.step()
 
+                    self.dis_optim.zero_grad()
                     dis_loss = self.model(input_ids, attention_mask=attention_mask,
                                     start_positions=start_positions,
                                     end_positions=end_positions, labels=labels, dtype='dis',
                                     global_step=step)
                     dis_loss = dis_loss.mean()
                     dis_loss.backward()
+
                     avg_dis_loss = self.cal_running_avg_loss(dis_loss.item(), avg_dis_loss)
                     self.dis_optim.step()
 
