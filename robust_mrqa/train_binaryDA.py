@@ -14,6 +14,7 @@ from distilbert_DANN import DomainQA
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from args import get_train_test_args
+import xuran_perform_eda
 
 from tqdm import tqdm
 
@@ -214,6 +215,7 @@ class Trainer():
         if self.args.load_weights != '':
             self.model.load_state_dict(torch.load(self.args.load_weights))
             print('loaded pretrained weights ... ')
+        self.save(self.model)
         global_idx = 0
         avg_qa_loss = 0
         avg_dis_loss = 0
@@ -292,7 +294,7 @@ def get_train_dataset(args, target_data_dir, target_dataset, tokenizer, split_na
         data_encodings_source = read_and_process(args, tokenizer, dataset_dict_source, source_data_dir, source_dataset_name, split_name)
     datasets = target_dataset.split(',')
     for dataset in datasets:
-        target_dataset_name = f'_{dataset}'
+        target_dataset_name += f'_{dataset}'
         # dataset_dict_curr = util.read_squad(f'{target_data_dir}/{dataset}', label=1)
         dataset_dict_curr = xuran_perform_eda.perform_eda(f'{target_data_dir}/{dataset}', dataset, train_fraction=1, label=1)
         dataset_dict_target = util.merge(dataset_dict_target, dataset_dict_curr)
@@ -311,6 +313,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name):
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
+
 def main():
     # define parser and arguments
     args = get_train_test_args()
@@ -348,8 +351,8 @@ def main():
                                        source_dataset=args.source_train_datasets)
         log.info("Preparing Validation Data...")
         val_dataset, val_dict = get_dataset(args, \
-                                       args.eval_dir,\
                                        args.eval_datasets,\
+                                       args.eval_dir,\
                                        tokenizer, 'val')
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
