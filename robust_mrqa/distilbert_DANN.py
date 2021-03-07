@@ -4,33 +4,6 @@ import torch.nn.functional as F
 from transformers import DistilBertForQuestionAnswering
 from util import kl_coef
 
-
-class DomainDiscriminator(nn.Module):
-    def __init__(self, num_classes=6, input_size=768 * 2,
-                 hidden_size=768, num_layers=3, dropout=0.1):
-        super(DomainDiscriminator, self).__init__()
-        self.num_layers = num_layers
-        hidden_layers = []
-        for i in range(num_layers):
-            if i == 0:
-                input_dim = input_size
-            else:
-                input_dim = hidden_size
-            hidden_layers.append(nn.Sequential(
-                nn.Linear(input_dim, hidden_size),
-                nn.ReLU(), nn.Dropout(dropout)
-            ))
-        hidden_layers.append(nn.Linear(hidden_size, num_classes))
-        self.hidden_layers = nn.ModuleList(hidden_layers)
-
-    def forward(self, x):
-        # forward pass
-        for i in range(self.num_layers - 1):
-            x = self.hidden_layers[i](x)
-        logits = self.hidden_layers[-1](x)
-        log_prob = F.log_softmax(logits, dim=1)
-        return log_prob
-
 class Discriminator(nn.Module):
     """Discriminator model for source domain."""
 
@@ -54,13 +27,6 @@ class Discriminator(nn.Module):
 def MMD(source, target):
     mmd_loss = torch.exp(-1 / (source.mean(dim=0) - target.mean(dim=0)).norm())
     return mmd_loss
-
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from pytorch_pretrained_bert import BertModel, BertConfig
-from utils import kl_coef
 
 
 class DomainDiscriminator(nn.Module):
@@ -100,7 +66,7 @@ class DomainQA(nn.Module):
         self.config.output_hidden_states = True
         self.config.output_attentions = True
         self.config.output_scores = True
-        self.WEIGHTS_NAME="DomainQA"
+        self.WEIGHTS_NAME="DistillBert_DANN"
 
         self.qa_outputs = nn.Linear(hidden_size, 2)
         # init weight
@@ -134,17 +100,12 @@ class DomainQA(nn.Module):
 
         else:
             sequence_output = self.distilbert(input_ids, attention_mask=attention_mask, start_positions=start_positions, end_positions=end_positions)#, output_all_encoded_layers=False)
-            logits = self.qa_outputs(sequence_output)
-            start_logits, end_logits = logits.split(1, dim=-1)
-            start_logits = start_logits.squeeze(-1)
-            end_logits = end_logits.squeeze(-1)
+            return sequence_output
 
-            return start_logits, end_logits
-
-    def forward_qa(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
+    def forward_qa(self, input_ids, attention_mask, start_positions, end_positions, global_step):
         sequence_output = self.distilbert(input_ids, attention_mask=attention_mask, start_positions=start_positions,
                                           end_positions=end_positions)  # , output_all_encoded_layers=False)
-        hidden = sequence_output.hidden[-1]
+        hidden = sequence_output.hidden_states[-1]
         hidden = hidden[:, 0]
         log_prob = self.discriminator(hidden)
         targets = torch.ones_like(log_prob) * (1 / self.num_classes)
@@ -161,8 +122,8 @@ class DomainQA(nn.Module):
 
     def forward_discriminator(self, input_ids, attention_mask, labels):
         with torch.no_grad():
-            sequence_output, _ = self.distilbert(input_ids, attention_mask)#, output_all_encoded_layers=False)
-            hidden = sequence_output.hidden[-1]
+            sequence_output = self.distilbert(input_ids, attention_mask)#, output_all_encoded_layers=False)
+            hidden = sequence_output.hidden_states[-1]
             hidden = hidden[:, 0]  # [b, d] : [CLS] representation
         log_prob = self.discriminator(hidden.detach())
         criterion = nn.NLLLoss()

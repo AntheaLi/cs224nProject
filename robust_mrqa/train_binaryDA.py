@@ -182,7 +182,8 @@ class Trainer():
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
                 batch_size = len(input_ids)
-                start_logits, end_logits  = self.model(input_ids, attention_mask)
+                outputs  = self.model(input_ids, attention_mask)
+                start_logits, end_logits = outputs.start_logits, outputs.end_logits
                 # Forward
 
                 all_start_logits.append(start_logits)
@@ -276,29 +277,43 @@ class Trainer():
                     global_idx += 1
         return best_scores
 
-def get_dataset(args, target_data_dir, target_dataset, tokenizer, split_name, source_data_dir=None, source_dataset=None):
+def get_train_dataset(args, target_data_dir, target_dataset, tokenizer, split_name, source_data_dir=None, source_dataset=None):
     dataset_dict_source = None
     dataset_dict_target = None
     data_encodings_source = None
+    source_dataset_name = 'binary'
+    target_dataset_name = 'binary'
     if source_data_dir is not None and source_dataset is not None:
-        source_dataset_name = f'_{source_dataset}'
+        datasets = source_dataset.split(',')  
+        for dataset in datasets:
+            source_dataset_name += f'_{dataset}'
+            dataset_dict_curr = util.read_squad(f'{source_data_dir}/{dataset}',label=0)
+            dataset_dict_source = util.merge(dataset_dict_source, dataset_dict_curr)
         data_encodings_source = read_and_process(args, tokenizer, dataset_dict_source, source_data_dir, source_dataset_name, split_name)
     datasets = target_dataset.split(',')
     for dataset in datasets:
         target_dataset_name = f'_{dataset}'
-        dataset_dict_curr = util.read_squad(f'{target_data_dir}/{dataset}', label=1)
+        # dataset_dict_curr = util.read_squad(f'{target_data_dir}/{dataset}', label=1)
+        dataset_dict_curr = xuran_perform_eda.perform_eda(f'{target_data_dir}/{dataset}', dataset, train_fraction=1, label=1)
         dataset_dict_target = util.merge(dataset_dict_target, dataset_dict_curr)
     data_encodings_target = read_and_process(args, tokenizer, dataset_dict_target, target_data_dir, target_dataset_name, split_name)
-    dataset_dict = dataset_dict_target.update(dataset_dict_source)
-    if len(dataset_dict) > len(dataset_dict_target) and split_name=='train':
-        print('...successfully merged training data...')
-    data_encodings = data_encodings_target.update(data_encodings_source)
+    dataset_dict = util.merge(dataset_dict_source, dataset_dict_target)
+    data_encodings = util.merge(data_encodings_source, data_encodings_target)
     return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
 
+def get_dataset(args, datasets, data_dir, tokenizer, split_name):
+    datasets = datasets.split(',')
+    dataset_dict = None
+    dataset_name='binary'
+    for dataset in datasets:
+        dataset_name += f'_{dataset}'
+        dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}', label=1)
+        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+    data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
+    return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
 def main():
     # define parser and arguments
     args = get_train_test_args()
-    args.num_classes = len(args.train_datasets.split(','))
     util.set_seed(args.seed)
     # model = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
     model =  DomainQA(args.num_classes,
@@ -317,9 +332,15 @@ def main():
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         if args.load_weights != '':
             args.load_weights = os.path.join(args.load_weights, 'checkpoint', model.WEIGHTS_NAME)
+            model.load_state_dict(torch.load(args.load_weights))
+        if args.load_distilbert_weights != '':
+            args.load_distilbert_weights = os.path.join(args.load_distilbert_weights, 'checkpoint', model.WEIGHTS_NAME)
+            model.distilbert.load_state_dict(torch.load(args.load_distilbert_weights))
+            print('loaded pretrained distilbert weights from', args.load_distilbert_weights)
+
         trainer = Trainer(args, log, model)
         #target_data_dir, target_dataset, tokenizer, split_name, source_data_dir = None, source_dataset = None
-        train_dataset, _ = get_dataset(args, \
+        train_dataset, _ = get_train_dataset(args, \
                                        args.target_train_dir,\
                                        args.target_train_datasets,\
                                        tokenizer, 'train', \
