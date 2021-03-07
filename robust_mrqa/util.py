@@ -516,6 +516,15 @@ def progress_bar(completed, total, step=5):
     bar += ']'
     return bar
 
+def print_grad(model):
+    all_grad = 0
+    for n, p in model.named_parameters():
+        try:
+            all_grad += p.grad.norm()
+        except:
+            print(n)
+    return all_grad
+
 
 def user_friendly_time(s):
     """ Display a user friendly time from number of second. """

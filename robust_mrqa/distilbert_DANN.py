@@ -34,24 +34,17 @@ class DomainDiscriminator(nn.Module):
                  hidden_size=768, num_layers=3, dropout=0.1):
         super(DomainDiscriminator, self).__init__()
         self.num_layers = num_layers
-        hidden_layers = []
+        hidden_layers = [nn.Linear(input_size, hidden_size), nn.LeakyReLU()]
+
         for i in range(num_layers):
-            if i == 0:
-                input_dim = input_size
-            else:
-                input_dim = hidden_size
-            hidden_layers.append(nn.Sequential(
-                nn.Linear(input_dim, hidden_size),
-                nn.ReLU(), nn.Dropout(dropout)
-            ))
+            hidden_layers.append(nn.Linear(hidden_size, hidden_size))
+            hidden_layers.append(nn.ReLU())
         hidden_layers.append(nn.Linear(hidden_size, num_classes))
-        self.hidden_layers = nn.ModuleList(hidden_layers)
+        self.hidden_layers = nn.Sequential(*hidden_layers)
 
     def forward(self, x):
         # forward pass
-        for i in range(self.num_layers - 1):
-            x = self.hidden_layers[i](x)
-        logits = self.hidden_layers[-1](x)
+        logits = self.hidden_layers(x)
         log_prob = F.log_softmax(logits, dim=1)
         return log_prob
 
@@ -68,16 +61,12 @@ class DomainQA(nn.Module):
         self.config.output_scores = True
         self.WEIGHTS_NAME="DistillBert_DANN"
 
-        self.qa_outputs = nn.Linear(hidden_size, 2)
-        # init weight
-        self.qa_outputs.weight.data.normal_(mean=0.0, std=0.02)
-        self.qa_outputs.bias.data.zero_()
         if concat:
             input_size = 2 * hidden_size
         else:
             input_size = hidden_size
-        self.discriminator = DomainDiscriminator(num_classes, input_size, hidden_size, num_layers, dropout)
 
+        self.discriminator = DomainDiscriminator(num_classes, input_size, hidden_size, num_layers, dropout)
         self.num_classes = num_classes
         self.dis_lambda = dis_lambda
         self.anneal = anneal
@@ -125,7 +114,8 @@ class DomainQA(nn.Module):
             sequence_output = self.distilbert(input_ids, attention_mask)#, output_all_encoded_layers=False)
             hidden = sequence_output.hidden_states[-1]
             hidden = hidden[:, 0]  # [b, d] : [CLS] representation
-        log_prob = self.discriminator(hidden.detach())
+            hidden = hidden.clone().detach()
+        log_prob = self.discriminator(hidden)
         criterion = nn.NLLLoss()
         loss = criterion(log_prob, labels)
         return loss
