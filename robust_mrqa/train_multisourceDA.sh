@@ -3,5 +3,5 @@ python train_multisourceDA.py \
     --eval-every 2000 \
     --batch-size 32 \
     --num_classes 6 \
-    --load_distilbert_weights "/media/liyichen/scratch/courses/224n/project/robustqa/save/baseline-01" \
+    --load_distilbert_weights "/home/hehe/cs224nProject/" \
     --run-name MSDA

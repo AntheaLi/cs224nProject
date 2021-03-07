@@ -13,9 +13,9 @@ def get_train_test_args():
     parser.add_argument('--train-datasets', type=str, default='squad,nat_questions,newsqa')
     parser.add_argument('--run-name', type=str, default='multitask_distilbert')
     parser.add_argument('--recompute-features', action='store_true')
-    parser.add_argument('--train-dir', type=str, default='/media/liyichen/scratch/data/nlpdomaindatasets/indomain_train')
-    parser.add_argument('--val-dir', type=str, default='/media/liyichen/scratch/data/nlpdomaindatasets/indomain_val')
-    parser.add_argument('--eval-dir', type=str, default='/media/liyichen/scratch/data/nlpdomaindatasets/oodomain_val')
+    parser.add_argument('--train-dir', type=str, default='/home/hehe/cs224nProject/datasets/indomain_train')
+    parser.add_argument('--val-dir', type=str, default='/home/hehe/cs224nProject/datasets/indomain_val')
+    parser.add_argument('--eval-dir', type=str, default='/home/hehe/cs224nProject/datasets/oodomain_val')
     parser.add_argument('--eval-datasets', type=str, default='race,relation_extraction,duorc')
     parser.add_argument('--load_weights', type=str, default='')
     parser.add_argument('--load_distilbert_weights', type=str, default='')
@@ -33,8 +33,8 @@ def get_train_test_args():
     parser.add_argument('--num_classes', type=int, default=3)
     parser.add_argument('--source-train-datasets', type=str, default='squad,nat_questions,newsqa')
     parser.add_argument('--target-train-datasets', type=str, default='race,relation_extraction,duorc')
-    parser.add_argument('--source-train-dir', type=str,default='/media/liyichen/scratch/data/nlpdomaindatasets/indomain_train')
-    parser.add_argument('--target-train-dir', type=str, default='/media/liyichen/scratch/data/nlpdomaindatasets/oodomain_train')
+    parser.add_argument('--source-train-dir', type=str,default='/home/hehe/cs224nProject/datasets/indomain_train')
+    parser.add_argument('--target-train-dir', type=str, default='/home/hehe/cs224nProject/datasets/oodomain_train')
 
     args = parser.parse_args()
     return args
