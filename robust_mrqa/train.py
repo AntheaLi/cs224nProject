@@ -289,6 +289,20 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name):
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
 
+
+def get_xuran_dataset(args, datasets, data_dir, tokenizer, split_name):
+    datasets = datasets.split(',')
+    dataset_dict = None
+    dataset_name=''
+    label = 0
+    for dataset in datasets:
+        dataset_name += f'_{dataset}'
+        dataset_dict_curr = xuran_perform_eda.perform_eda(f'{target_data_dir}/{dataset}', dataset, train_fraction=1, label=1)
+#         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}', label=label)
+        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+    data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
+    return util.QADomainDataset(data_encodings, train=(split_name=='train')), dataset_dict
+
 def main():
     # define parser and arguments
     args = get_train_test_args()
@@ -314,7 +328,7 @@ def main():
         trainer = Trainer(args, log, model)
         train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train')
         log.info("Preparing Validation Data...")
-        val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val')
+        val_dataset, val_dict = get_xuran_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val')
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
                                 sampler=RandomSampler(train_dataset))
