@@ -33,7 +33,7 @@ alpha_sr = 0.3
 alpha_ri = 0
 alpha_rs = 0
 p_rd = 0
-num_aug = 4  (Note: Based on eda.py, you have to set num_aug = 4 instead of 2, to get 2 augumented sentences per original sentence)
+num_aug = 4  (Note: Due to the tricky implementation of eda.py, you have to set num_aug = 4 instead of 2, to get 2 augumented sentences per original sentence)
 
 ===================================================
 
