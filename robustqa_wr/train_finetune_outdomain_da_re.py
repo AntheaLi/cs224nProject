@@ -148,7 +148,7 @@ def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, spli
 #TODO: use a logger, use tensorboard
 class Trainer():
     def __init__(self, args, log):
-        self.lr = args.
+        self.lr = args.lr
 
         '''###'''
         self.adam_epsilon = args.adam_epsilon
