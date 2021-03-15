@@ -40,6 +40,7 @@ num_aug = 4  (Note: Due to the tricky implementation of eda.py, you have to set 
 Currently the BEST model is obtained by finetune baseline with EDA-enhanced OOD train sets, where alpha_SR = 0.3, n_aug = 2 per original sentences. No RI, RS, RD is applied. 
 
 Path: baseline_finetune_outdomain_eda_SR_0_3-01/checkpoint
+
 Uploaded to: https://drive.google.com/drive/u/2/folders/15TRvz22_Zlj4DFGXiVP1mvAlSYpaxFL7
 
 
@@ -50,6 +51,8 @@ Eval F1: 51.10, EM: 37.43
 What files are changed?
 
 1. eda.py  -> Brand new file for EDA
+
 2. xuran_perform_eda.py -> Brand new file for EDA
+
 3. train_finetune_outdomain.py  -> This file is based on the original train.py file with a little modification. 
 
