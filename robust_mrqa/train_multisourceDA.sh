@@ -1,6 +1,6 @@
 python train_multisourceDA.py \
     --do-train \
-    --eval-every 200 \
+    --eval-every 2000 \
     --batch-size 32 \
     --num_classes 6 \
     --lr 1e-4 \

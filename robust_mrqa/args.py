@@ -35,6 +35,9 @@ def get_train_test_args():
     parser.add_argument('--target-train-datasets', type=str, default='race,relation_extraction,duorc')
     parser.add_argument('--source-train-dir', type=str,default='/media/liyichen/scratch/data/nlpdomaindatasets/indomain_train')
     parser.add_argument('--target-train-dir', type=str, default='/media/liyichen/scratch/data/nlpdomaindatasets/oodomain_train')
+    parser.add_argument('--clamp_lower', type=float, default=-0.01)
+    parser.add_argument('--clamp_upper', type=float, default=0.01)
+    parser.add_argument('--wasserstein', action='store_true')
 
     args = parser.parse_args()
     return args

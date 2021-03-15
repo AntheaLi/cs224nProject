@@ -157,6 +157,7 @@ class Trainer():
         qa_params = list(self.model.distilbert.parameters())
         dis_params = list(self.model.discriminator.parameters())
         self.qa_optim = AdamW(qa_params, lr=self.lr)
+        self.dis_optim = AdamW(dis_params, lr=self.lr)
 
     def save(self, model):
         model.save_pretrained(self.path)
@@ -232,6 +233,11 @@ class Trainer():
                     labels = batch['label'].to(device)
                     ##################################
                     # start adversarial training
+
+                    if args.wasserstein:
+                        for p in self.model.discriminator.parameters():
+                            p.data.clamp_(args.clamp_lower, args.clamp_upper)
+                    
                     self.qa_optim.zero_grad()
                     qa_loss = self.model(input_ids, attention_mask=attention_mask,
                                     start_positions=start_positions,
