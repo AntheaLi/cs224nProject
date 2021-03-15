@@ -1,6 +1,8 @@
+PLEASE READ BEFORE YOU PERFORM EDA
+===================================================
+
 Baseline: Eval F1: 47.96   EM: 32.20
 Baseline + OOD : Eval F1: 49.43, EM: 36.39
-===================================================
 
 NOTE EVERYTIME YOU PERFORM EDA :  Be sure to repeat following steps otherwise the results are inaccurate!!!!!
 
