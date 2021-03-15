@@ -3,4 +3,4 @@ python train.py \
 --eval-every 2000 \
 --reinit_layers 1 \
 --warmup_ratio 0.3 \
---run-name baseline
+--run-name baseline_with_reinit1_wr0.3
