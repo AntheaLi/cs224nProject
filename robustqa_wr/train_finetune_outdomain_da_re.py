@@ -13,13 +13,21 @@ from tensorboardX import SummaryWriter
 
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
-from args import get_train_test_args
+'''###'''
+from args_finetune_outdomain_da_re import get_train_test_args
 
 from tqdm import tqdm
 
 '''###'''
 from prior_wd_optim import PriorWD
 from transformers import get_linear_schedule_with_warmup
+
+#### Change Made By Xuran Wang: Add lines #######
+import xuran_perform_eda
+
+train_fraction = 1
+
+#### Change End #######
 
 def prepare_eval_data(dataset_dict, tokenizer):
     tokenized_examples = tokenizer(dataset_dict['question'],
@@ -132,7 +140,7 @@ def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, spli
             tokenized_examples = prepare_train_data(dataset_dict, tokenizer)
         else:
             tokenized_examples = prepare_eval_data(dataset_dict, tokenizer)
-        util.save_pickle(tokenized_examples, cache_path)  # For next time usage
+        util.save_pickle(tokenized_examples, cache_path)
     return tokenized_examples
 
 
@@ -140,7 +148,7 @@ def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, spli
 #TODO: use a logger, use tensorboard
 class Trainer():
     def __init__(self, args, log):
-        self.lr = args.lr
+        self.lr = args.
 
         '''###'''
         self.adam_epsilon = args.adam_epsilon
@@ -168,8 +176,6 @@ class Trainer():
 
     def evaluate(self, model, data_loader, data_dict, return_preds=False, split='validation'):
         device = self.device
-        # global_idx = 0
-        # tbx = SummaryWriter(self.save_dir)
 
         model.eval()
         pred_dict = {}
@@ -186,9 +192,6 @@ class Trainer():
                 # Forward
                 start_logits, end_logits = outputs.start_logits, outputs.end_logits
                 # TODO: compute loss
-                # loss = outputs[0]
-                # tbx.add_scalar('evaluate/NLL', loss.item(), global_idx)
-                # global_idx += 1
 
                 all_start_logits.append(start_logits)
                 all_end_logits.append(end_logits)
@@ -303,11 +306,6 @@ class Trainer():
             optimizer, num_warmup_steps=self.warmup_steps, num_training_steps=t_total
         )
 
-
-        '''
-        global_idx counts the total number of batches. For each epoch, there are around ~15000 batches. Since
-        the batch size is 16, we can calculate there is ~240000 (242304) indomain training data
-        '''
         global_idx = 0
         best_scores = {'F1': -1.0, 'EM': -1.0}
         tbx = SummaryWriter(self.save_dir)
@@ -316,7 +314,7 @@ class Trainer():
             self.log.info(f'Epoch: {epoch_num}')
             with torch.enable_grad(), tqdm(total=len(train_dataloader.dataset)) as progress_bar:
                 for batch in train_dataloader:
-                    # optim.zero_grad()  # Same as model.zero_grad()
+                    # optim.zero_grad()
 
                     '''###'''
                     optimizer.zero_grad()  # Same as model.zero_grad()
@@ -340,7 +338,6 @@ class Trainer():
                     progress_bar.update(len(input_ids))
                     progress_bar.set_postfix(epoch=epoch_num, NLL=loss.item())
                     tbx.add_scalar('train/NLL', loss.item(), global_idx)
-
                     if (global_idx % self.eval_every) == 0:
                         self.log.info(f'Evaluating at step {global_idx}...')
                         preds, curr_score = self.evaluate(model, eval_dataloader, val_dict, return_preds=True)
@@ -362,6 +359,18 @@ class Trainer():
                     global_idx += 1
         return best_scores
 
+def get_dataset_eda_revised(args, datasets, data_dir, tokenizer, split_name, train_fraction):
+    datasets = datasets.split(',')
+    dataset_dict = None
+    dataset_name=''
+    for dataset in datasets:
+        dataset_name += f'_{dataset}'
+        # dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
+        dataset_dict_curr = xuran_perform_eda.perform_eda(f'{data_dir}/{dataset}', dataset, train_fraction)
+        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+    data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
+    return util.QADataset(data_encodings, train=(split_name=='train')), dataset_dict
+
 def get_dataset(args, datasets, data_dir, tokenizer, split_name):
     datasets = datasets.split(',')
     dataset_dict = None
@@ -369,7 +378,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name):
     for dataset in datasets:
         dataset_name += f'_{dataset}'
         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
-        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)  # {'question': [], 'context': [], 'id': [], 'answer': []}
+        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADataset(data_encodings, train=(split_name=='train')), dataset_dict
 
@@ -378,45 +387,22 @@ def main():
     args = get_train_test_args()
 
     util.set_seed(args.seed)
-    model = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
+
+    #### Change Made By Xuran Wang: Comment out original lines #######
+
+    # model = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
+    # tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+
+    #### Change End #######
+
+
+
+    #### Change Made By Xuran Wang: Add custom lines #######
+
     tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
+    finetuned_model_path = 'save/baseline-01/'
 
-    '''###'''
-    # if args.reinit_pooler:
-    #     encoder_temp = getattr(model, "distilbert")  # Equivalent to model.distilbert
-    #     encoder_temp.pooler.dense.weight.data.normal_(mean=0.0, std=encoder_temp.config.initializer_range)
-    #     encoder_temp.pooler.dense.bias.data.zero_()  # The change of encoder_temp would affect the model
-    #     for p in encoder_temp.pooler.parameters():
-    #         p.requires_grad = True
-
-
-    if args.reinit_layers > 0:
-        import torch.nn as nn
-        from transformers.models.distilbert.modeling_distilbert import MultiHeadSelfAttention, FFN
-        # model_distilbert = getattr(model, "distilbert")  # model.distilbert; change of model_distilbert affects model!
-        # Reinitialization for the last few layers
-        for layer in model.distilbert.transformer.layer[-args.reinit_layers:]:
-            for module in layer.modules():
-                # print(module)
-                model.distilbert._init_weights(module)  # It's the line equivalent to below approach
-                # if isinstance(module, nn.modules.linear.Linear):  # Original form for nn.Linear
-                #     # model.config.initializer_range == model.distilbert.config.initializer_range => True
-                #     module.weight.data.normal_(mean=0.0, std=model.distilbert.config.initializer_range)
-                #     if module.bias is not None:
-                #         module.bias.data.zero_()
-                # elif isinstance(module, nn.modules.normalization.LayerNorm):
-                #     module.weight.data.fill_(1.0)
-                #     module.bias.data.zero_()
-                # elif isinstance(module, FFN):
-                #     for param in [module.lin1, module.lin2]:
-                #         param.weight.data.normal_(mean=0.0, std=model.distilbert.config.initializer_range)
-                #         if param.bias is not None:
-                #             param.bias.data.zero_()
-                # elif isinstance(module, MultiHeadSelfAttention):
-                #     for param in [module.q_lin, module.k_lin, module.v_lin, module.out_lin]:
-                #         param.data.weight.normal_(mean=0.0, std=model.distilbert.config.initializer_range)
-                #         if param.bias is not None:
-                #             param.bias.data.zero_()
+    #### Change End #######
 
 
     if args.do_train:
@@ -426,14 +412,71 @@ def main():
         log = util.get_logger(args.save_dir, 'log_train')
         log.info(f'Args: {json.dumps(vars(args), indent=4, sort_keys=True)}')
         log.info("Preparing Training Data...")
+
+
+        #### Change Made By Xuran Wang: Add custom lines #######
+
+        checkpoint_path = os.path.join(finetuned_model_path, 'checkpoint')
+        model = DistilBertForQuestionAnswering.from_pretrained(checkpoint_path)
+
+        #### Change End #######
+
+        '''###'''
+        # if args.reinit_pooler:
+        #     encoder_temp = getattr(model, "distilbert")  # Equivalent to model.distilbert
+        #     encoder_temp.pooler.dense.weight.data.normal_(mean=0.0, std=encoder_temp.config.initializer_range)
+        #     encoder_temp.pooler.dense.bias.data.zero_()  # The change of encoder_temp would affect the model
+        #     for p in encoder_temp.pooler.parameters():
+        #         p.requires_grad = True
+
+
+        if args.reinit_layers > 0:
+            import torch.nn as nn
+            from transformers.models.distilbert.modeling_distilbert import MultiHeadSelfAttention, FFN
+            # model_distilbert = getattr(model, "distilbert")  # model.distilbert; change of model_distilbert affects model!
+            # Reinitialization for the last few layers
+            for layer in model.distilbert.transformer.layer[-args.reinit_layers:]:
+                for module in layer.modules():
+                    # print(module)
+                    model.distilbert._init_weights(module)  # It's the line equivalent to below approach
+                    # if isinstance(module, nn.modules.linear.Linear):  # Original form for nn.Linear
+                    #     # model.config.initializer_range == model.distilbert.config.initializer_range => True
+                    #     module.weight.data.normal_(mean=0.0, std=model.distilbert.config.initializer_range)
+                    #     if module.bias is not None:
+                    #         module.bias.data.zero_()
+                    # elif isinstance(module, nn.modules.normalization.LayerNorm):
+                    #     module.weight.data.fill_(1.0)
+                    #     module.bias.data.zero_()
+                    # elif isinstance(module, FFN):
+                    #     for param in [module.lin1, module.lin2]:
+                    #         param.weight.data.normal_(mean=0.0, std=model.distilbert.config.initializer_range)
+                    #         if param.bias is not None:
+                    #             param.bias.data.zero_()
+                    # elif isinstance(module, MultiHeadSelfAttention):
+                    #     for param in [module.q_lin, module.k_lin, module.v_lin, module.out_lin]:
+                    #         param.data.weight.normal_(mean=0.0, std=model.distilbert.config.initializer_range)
+                    #         if param.bias is not None:
+                    #             param.bias.data.zero_()
+
+
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        model.to(args.device)
+
         trainer = Trainer(args, log)
-        train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train')
+
+        #### Change Made By Xuran Wang: Add custom lines, comment out original line #######
+
+        # train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train')
+
+        train_dataset, _ = get_dataset_eda_revised(args, args.train_datasets, args.train_dir, tokenizer, 'train', train_fraction)
+
+         #### Change End #######
+
         log.info("Preparing Validation Data...")
         val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val')
         train_loader = DataLoader(train_dataset,
                                 batch_size=args.batch_size,
-                                sampler=RandomSampler(train_dataset))  # For squad: 50537/16~3159 items/batches
+                                sampler=RandomSampler(train_dataset))
         val_loader = DataLoader(val_dataset,
                                 batch_size=args.batch_size,
                                 sampler=SequentialSampler(val_dataset))
@@ -444,7 +487,7 @@ def main():
         log = util.get_logger(args.save_dir, f'log_{split_name}')
         trainer = Trainer(args, log)
         checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
-        model = DistilBertForQuestionAnswering.from_pretrained(checkpoint_path)  # Trained model
+        model = DistilBertForQuestionAnswering.from_pretrained(checkpoint_path)
         model.to(args.device)
         eval_dataset, eval_dict = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name)
         eval_loader = DataLoader(eval_dataset,
