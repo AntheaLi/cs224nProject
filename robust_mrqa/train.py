@@ -283,6 +283,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name):
     label = 0
     for dataset in datasets:
         dataset_name += f'_{dataset}'
+#         dataset_dict_curr = xuran_perform_eda.perform_eda(f'{target_data_dir}/{dataset}', dataset, train_fraction=1, label=1)
         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}', label=label)
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
