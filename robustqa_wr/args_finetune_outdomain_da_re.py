@@ -44,7 +44,7 @@ def get_train_test_args():
     parser.add_argument('--train', action='store_true')
     parser.add_argument('--eval', action='store_true')
     parser.add_argument('--train-datasets', type=str, default='duorc,race,relation_extraction')  # 'squad,nat_questions,newsqa'
-    parser.add_argument('--run-name', type=str, default='baseline_finetune_outdomain_da_best_reinit1')
+    parser.add_argument('--run-name', type=str, default='baseline_finetune_outdomain_da_best_reinit0')
     parser.add_argument('--recompute-features', action='store_true')
     parser.add_argument('--train-dir', type=str, default='datasets/oodomain_train')  # Also indomain_train
     parser.add_argument('--val-dir', type=str, default='datasets/oodomain_val')  # Also indomain_val
