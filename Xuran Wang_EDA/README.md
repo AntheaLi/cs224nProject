@@ -22,8 +22,8 @@ The .pt file is created when you finetune on OOD train sets. However, if you don
 PARAMETER RECOMMENDATION (Please change them in xuran_perform_eda.py ):
 
 alpha_sr = 0.3
-alpha_ri = 0.01
-alpha_rs = 0.01
+alpha_ri = 0.05
+alpha_rs = 0.05
 p_rd = 0.2
 num_aug = 8 (or 2)
 
