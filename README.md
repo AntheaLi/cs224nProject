@@ -10,6 +10,16 @@ OUR FINAL BEST MODEL (Evaluated on OOD validation set)：
 
 Eval F1: 51.37, EM: 37.70 with 8.56% F1 performance boost against baseline model
 
+================================================
+
+In this project, we study the problem of domain adaptive questionanswering leveraging various techniques, ranging from Data Augmentation, LayerRe-initialization and Domain Adversarial Alignment.  
+
+Please refer to their corrosponding directory for code implementation!
+
+Data Augmentation: Xuran Wang_EDA
+LayerRe-initialization: robustqa_wr
+Domain Adversarial Alignment: domain_qa
+
 
 
 MRQA: https://github.com/seanie12/mrqa
