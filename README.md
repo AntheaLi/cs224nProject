@@ -18,8 +18,11 @@ Please refer to their corrosponding directory for code implementation:
 
 Baseline: robustqa
 
-Data Augmentation: Xuran_Wang_EDA
+
+Data Augmentation: Xuran Wang_EDA
+
 LayerRe-initialization: robustqa_wr
+
 Domain Adversarial Alignment: domain_qa
 
 ================================================
