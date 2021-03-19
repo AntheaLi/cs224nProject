@@ -4,6 +4,12 @@ Baseline: Eval F1: 47.96   EM: 32.20
 
 Baseline + OOD : Eval F1: 49.43, EM: 36.39
 
+===============================================
+
+OUR FINAL BEST MODEL (Evaluated on OOD validation set)：
+
+Eval F1: 51.37, EM: 37.70 with 8.56% F1 performance boost against baseline model
+
 
 
 MRQA: https://github.com/seanie12/mrqa
