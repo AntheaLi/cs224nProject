@@ -4,13 +4,6 @@ Baseline: Eval F1: 47.96   EM: 32.20
 
 Baseline + OOD : Eval F1: 49.43, EM: 36.39
 
-Currently the BEST model is obtained by finetune baseline with EDA-enhanced OOD train sets, where alpha_SR = 0.3, n_aug = 2 per original sentences. No RI, RS, RD is applied.
-
-Path: baseline_finetune_outdomain_eda_SR_0_3-01/checkpoint
-
-Uploaded to: https://drive.google.com/drive/u/2/folders/15TRvz22_Zlj4DFGXiVP1mvAlSYpaxFL7
-
-Eval F1: 51.10, EM: 37.43
 
 
 MRQA: https://github.com/seanie12/mrqa
